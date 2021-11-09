@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DatingApp.Data;
 using DatingApp.DTO;
 using DatingApp.Entities;
+using DatingApp.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,13 +16,15 @@ namespace DatingApp.Controllers
     public class AccountController : BaseAPIController
     {
         private readonly DataContext Context;
-        public AccountController(DataContext context)
+        public IToken Token { get; }
+        public AccountController(DataContext context,IToken token)
         {
+            this.Token = token;
             this.Context = context;
         }
 
        [HttpPost("register")]
-       public async Task<ActionResult<AppUser>> Register(Register register)
+       public async Task<ActionResult<User>> Register(Register register)
        {
            if (await CheckUserAlreadyExist(register.UserName)) return BadRequest("User Name Already Exists");
 
@@ -36,11 +39,14 @@ namespace DatingApp.Controllers
 
             Context.Users.Add(user);
             await Context.SaveChangesAsync(); 
-            return  user;      
+            return  new User{
+                UserName= user.UserName,
+                Token=Token.CreateToken(user)
+            };   
        }
 
         [HttpPost("login")]
-        public async Task<ActionResult<AppUser>> Login(Login login)
+        public async Task<ActionResult<User>> Login(Login login)
         {
             var user = await Context.Users.SingleOrDefaultAsync(x =>x.UserName==login.UserName);
             if (user==null) return BadRequest("Invalid UserName");
@@ -56,7 +62,10 @@ namespace DatingApp.Controllers
                     }
             }
 
-            return user;
+            return new User{
+                UserName=user.UserName,
+                Token=Token.CreateToken(user)
+            };
             
         }
         private async Task<bool> CheckUserAlreadyExist(string username)
